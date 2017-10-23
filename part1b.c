@@ -79,25 +79,6 @@ int main(int argc, char **argv)
                 load_and_invoke(libname, funcname);
         }
         exit(0);
-	long opt;
-
-	/* run a student name check */
-	check_team(argv[0]);
-
-	/* parse the command-line options. For this program, we only support */
-	/* the parameterless 'h' option, for getting help on program usage.  */
-	while((opt = getopt(argc, argv, "h")) != -1)
-	{
-		switch(opt)
-		{
-		case 'h':	help(argv[0]); 	break;
-		}
-	}
-
-	/* call load_and_invoke() to run the given function of the given library */
-	load_and_invoke(argv[1], argv[2]);
-
-	exit(0);
 	
 }
 
