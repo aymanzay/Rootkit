@@ -49,22 +49,36 @@ int main(int argc, char **argv)
 	/* for getopt */
 	long opt;
 
-	/* run a student name check */
-	check_team(argv[0]);
+        /* run a student name check */
+        check_team(argv[0]);
+        char libname[1024];
+        char funcname[1024];
+        int lib = 0;
+        int func = 0;
 
-	/* parse the command-line options. For this program, we only support */
-	/* the parameterless 'h' option, for getting help on program usage.  */
-	while((opt = getopt(argc, argv, "h")) != -1)
-	{
-		switch(opt)
-		{
-		case 'h':	help(argv[0]); 	break;
-		}
-	}
+        /* parse the command-line options. For this program, we only support */
+        /* the parameterless 'h' option, for getting help on program usage.  */
+        while((opt = getopt(argc, argv, "hl:f:")) != -1)
+        {
+                switch(opt)
+                {
+                case 'h': help(argv[0]);        break;
+                case 'l':
+                        strcpy(libname, optarg);
+                        lib = 1;
+                        break;
+                case 'f':
+                        strcpy(funcname, optarg);
+                        func = 1;
+                        break;
+                }
 
-	/* call load_and_invoke() to run the given function of the given library */
-	load_and_invoke(argv[1], argv[2]);
-
-	exit(0);
+        }
+        /* call load_and_invoke() */
+        if(lib && func){
+                load_and_invoke(libname, funcname);
+        }
+        exit(0);
+	
 }
 
