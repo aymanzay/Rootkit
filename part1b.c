@@ -1,12 +1,37 @@
-#include<stdio.h>
-#include<unistd.h>
-#include<stdlib.h>
-#include"support.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+#include "support.h"
 
 /* load_and_invoke() - load the given .so and execute the specified function */
 void load_and_invoke(char *libname, char *funcname)
 {
 	/* TODO: complete this function */
+	void *handle;
+	char *error;
+
+	handle = dlopen(libname, RTLD_LAZY);
+
+	if(!handle) {
+		printf("invalid libname\n");
+		fputs(dlerror(), stderr);
+		printf("\n");
+		exit(1);
+	}
+	
+	void (*hello)(void *);
+	hello = dlsym(handle, funcname);
+
+	if((error = dlerror()) != NULL) {
+		printf("could not dynamically load function\n");
+		fputs(error, stderr);
+		printf("\n");
+		exit(1);
+	}
+
+	hello(handle);
+	dlclose(handle);
 }
 
 /* help() - Print a help message. */
@@ -38,7 +63,7 @@ int main(int argc, char **argv)
 	}
 
 	/* call load_and_invoke() to run the given function of the given library */
-	load_and_invoke(NULL, NULL);
+	load_and_invoke(argv[1], argv[2]);
 
 	exit(0);
 }
