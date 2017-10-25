@@ -17,6 +17,7 @@ using namespace std;
 struct file{
 	int fd;
 	char * filename;
+	int balance;
 };
 
 vector<size_t> *malloc_data = NULL;
@@ -100,6 +101,7 @@ extern "C"
 		bobFile->fd = fd;
 		bobFile->filename = (char *)malloc(sizeof(char)*15);
 		strcpy(bobFile->filename, filename);
+		bobFile->balance =-1;
 	}
 
 	int getBobFd(){
@@ -124,7 +126,9 @@ extern "C"
 		aliceFile->filename = (char *)malloc(sizeof(char)*15);
 		aliceFile->fd = fd;
 		strcpy(aliceFile->filename, filename);
+		aliceFile->balance = -1;
 	}
+
 
 	void closeAlice(int fd){
 		if(aliceOpen && (aliceFile->fd == fd)){
@@ -144,8 +148,20 @@ extern "C"
 		}
 	}
 
+	int getAliceBalance(){
+		return aliceFile->balance;
+	}
+	int getBobBalance(){
+		return bobFile->balance;
+	}
 
-
+	void setAliceBalance(int balance){
+		aliceFile->balance = balance;
+	}
+	void setBobBalance(int balance){
+		bobFile->balance = balance;
+	}
+		
 
 }
 

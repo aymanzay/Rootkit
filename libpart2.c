@@ -25,6 +25,10 @@ void closeBob();
 void closeAlice();
 int getBobFd();
 int getAliceFd();
+int getBobBalance();
+void setBobBalance(int balance);
+int getAliceBalance();
+void setAliceBalance(int balance);
 void setTask(int t);
 int getTask();
 void setDesc3(int val);
@@ -33,6 +37,9 @@ void setDesc4(int val);
 int getDesc4();
 void setTransfer(int val);
 int getTransfer();
+
+
+
 
 static int ignoreMalloc = 0;
 
@@ -73,7 +80,7 @@ static void allocate()
 
 
 int fscanf(FILE *stream, const char *format, ...){
-	
+	printf("in  fscanf\n");	
 	static int (*origFscanf)(FILE *,const char *, ...) = NULL;
 	if(!origFscanf)
 	{
@@ -111,25 +118,31 @@ int fscanf(FILE *stream, const char *format, ...){
 
 
 //Task 2
-
+/*
 int open(const char *pathname, int flags, ...){
-	//va_list ap;
-	//va_start(ap, flags);
+	va_list ap;
+	va_start(ap, flags);
 //	printf("in open \n");
-	//int mode = va_arg(int);
-	static int (*origOpen)(const char *, int) = NULL;
+	int mode;
+		
+	static int (*origOpen)(const char *, int, ...) = NULL;
 	if(!origOpen)
 	{
-		origOpen = (int (*)(const char *, int))dlsym(RTLD_NEXT, "open");
+		origOpen = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
 	}
 	
-	int fd = origOpen(pathname, flags);
-
+	int fd;
+	if((mode =va_arg(ap,int)) < 0){
+		origOpen(pathname, flags);
+	}
+	else{
+		origOpen(pathname, flags, mode);
+	}
+	printf("va_arg returned :%d \n", mode);
 
 	//Set the task number which is opened for each task
 	int t = atoi(pathname);
 	printf("In open, pathname: %s, task:%d \n", pathname, t);
-//	if((t < 10) && (t > 0)){ //Task opened
 	if(t == 4){
 		setTask(t);
 	}
@@ -138,8 +151,8 @@ int open(const char *pathname, int flags, ...){
 	//read(fd, readBuff, 20);
 	//printf("Read printed %s \n", readBuff);
 //	printf("in open filename %s \n", pathname);
-	//For task 2
-	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
+*/	//For task 2
+/*	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
 		openBob(fd, pathname);	
 		printf("open bob \n");
 
@@ -150,12 +163,43 @@ int open(const char *pathname, int flags, ...){
 	}
 	return fd;
 }
-
+*/
 /*int open(const char *pathname, int flags, mode_t mode){
 	printf("in second open filename %s  \n", pathname);
 	return 0;
 }*/
-	
+
+
+FILE *fopen(const char *pathname, const char *mode){
+
+	printf("in fopen pathname: %s \n", pathname);
+	static FILE *(*origFopen)(const char *, const char *) = NULL;
+	FILE *retval;
+	if(!origFopen)
+	{
+		origFopen = (FILE *(*)(const char *, const char *))dlsym(RTLD_NEXT, "fopen");
+	}
+
+	retval = origFopen(pathname, mode);
+
+	//Task 2
+	int fd = fileno(retval);
+	printf("fd is :%d \n",fd);
+	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
+		openBob(fd, pathname);	
+		printf("open bob \n");
+
+	}
+	if(strcmp(pathname, "alice.data") == 0){
+		openAlice(fd, pathname);
+		printf("open alice \n");
+	}
+
+	return retval;
+
+
+
+}
 
 int close(int fd){
 	int retval;
@@ -186,6 +230,7 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 	char *buff;
 
 	//Task 4
+	/*
 	printf("In write, task is %d: \n", getTask());
 	int task = getTask();
 	if(task == 4){
@@ -235,54 +280,70 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 		}
 
 	}
-	if((task != 4) && (handle != 4)){ //Take care of buffer being constant
+	if((task != 4) || (handle != 4)){ //Take care of buffer being constant
 		strcpy(buff, buffer);
 	}
-
-	int bob_fd = getBobFd();  // = fileno("bob.data");
-	int alice_fd = getAliceFd(); ; // = fileno("alice.data");
-
-//	printf("in write bobs fd:%d alices fd:%d handle:%d\n", bob_fd, alice_fd, handle);
-
-	if((bob_fd != -1) && (alice_fd != -1)){ //Bob is open
-		printf("in first if \n");
-		if(handle == bob_fd){
-			printf("in second if \n");
-			char buf[20]; //Old buffer
-			if(read(handle, buf, 20) == 3){ //Read 3 digits
-				printf("in read if - buf is %s \n", buf);
-				int diff = atoi(buffer) - atoi(buf); //100 would be added
-				if(diff == 100){
-					printf("in diff == 100 \n");
-					char newBuff[20];
-					strcpy(newBuff, (atoi(buf)-100)+"");
-					printf("new buff is %s \n", newBuff);
-					retval = origWrite(handle, newBuff, 3); //itoa(atoi(buf)-100), 3);
-					return retval;
-				}
+*/
+	//Task 2
+	int bob_fd = getBobFd(); 
+	int alice_fd = getAliceFd(); 
+	if((bob_fd != -1) && (alice_fd != -1)){ //Bob and Alice are  open
+		int bob_balance = getBobBalance();
+		int alice_balance = getAliceBalance();
+		if(bob_balance < 100){
+			if(handle == bob_fd){
+				char buf[20];
+				sprintf(buf, "%d", bob_balance);
+				int nbyte = strlen(buf);
+				retval = origWrite(handle, buf, nbyte); 
+				return retval;
 			}
-		}else if(alice_fd == handle){
-			char buf[20];
-			if(read(handle, buf, 20) == 3){ //Read 3 digits
-				int diff =  atoi(buf) - atoi(buffer); //100 would be subtracted
-				if(diff == 100){
-					char newBuff[20];
-					strcpy(newBuff, (atoi(buf)+100)+"");
-					retval = origWrite(handle, newBuff, 3); //itoa(atoi(buf)-100), 3);
-					return retval; //Break out of function
-				}
+			else if(handle == alice_fd){
+				char buf[20];
+				sprintf(buf, "%d", alice_balance);
+				int nbyte = strlen(buf);
+				retval = origWrite(handle, buf, nbyte); 
+				return retval;
 			}
 
 		}
 		else{
-			retval = origWrite(handle,(const char *)buff, nbyte);
+			if(handle == bob_fd){ //Bob is Open
+				char buf[21];
+				if(bob_balance == -1){
+					printf("Error: cannot get bobs balance");
+					exit(1);
+				}
+				printf("in read if - buf is %s \n", buf);
+				int diff = atoi(buffer) - bob_balance; //What we are about to assign the balance to what bob's balance was
+				if(diff == 100){
+					printf("in diff == 100 \n");
+					sprintf(buf, "%d", bob_balance-100);
+					printf("new buff is %s \n", buf);
+					int nbyte = strlen(buf);
+					retval = origWrite(handle, buf, nbyte); 
+					return retval; //Break out of function
+				}
+				
+			}else if(alice_fd == handle){ //Alice is Open
+				char buf[20];
+				printf("in alice if \n");
+				int curr_bal = atoi(buffer);
+				int diff =  alice_balance - curr_bal;
+				if(diff == 100){
+					int orig = alice_balance; 
+					sprintf(buf, "%d", orig+100);
+					int nbyte = strlen(buf);
+					retval = origWrite(handle, buf, nbyte);
+					return retval; //Break out of function
+				}
+		
+			}
 		}
-	}else {
-		retval = origWrite(handle, (const char *)buff, nbyte);
 	}
+	retval = origWrite(handle, buffer, nbyte);
 	return retval;
 }
-
 
 
 ssize_t read(int handle, void *buf, size_t nbyte){
@@ -296,6 +357,22 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 	retval = origRead(handle, buf, nbyte);
 
 	printf("read in %s \n", buf);
+
+
+	//Task 2
+	int bobFd = getBobFd();
+	int aliceFd = getAliceFd();
+	if((bobFd != -1) && (aliceFd != -1)){ // Alice and Bob are open
+		int bal = atoi(buf);
+		if(handle == aliceFd){
+			setAliceBalance(bal);
+		}
+		else if(handle == bobFd){
+			setBobBalance(bal);
+		}
+	}
+			
+
 	int task = getTask();
 	if(task == 4){
 		int prev_val = atoi(buf);
