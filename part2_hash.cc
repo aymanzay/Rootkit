@@ -30,8 +30,8 @@ struct file *aliceFile = (struct file *)malloc(sizeof(struct file));
 
 int task = -1;
 
-int prev_value1= 0;
-int prev_value2 =0;
+int prev_sender= 0;
+int prev_receiver =0;
 int transfer_value = 0;
 
 /* declare the following functions to have "C" linkage, so that
@@ -78,16 +78,16 @@ extern "C"
 	}
 
 	void setDesc3(int val){
-		prev_value1 = val;
+		prev_sender = val;
 	}
 	int getDesc3(){
-		return prev_value1;
+		return prev_sender;
 	}
 	void setDesc4(int val){
-		prev_value2 = val;
+		prev_receiver = val;
 	}
 	int getDesc4(){
-		return prev_value2;
+		return prev_receiver;
 	}
 	void setTransfer(int val){
 		transfer_value =val;
@@ -95,7 +95,6 @@ extern "C"
 	int getTransfer(){
 		return transfer_value;
 	}
-
 	void openBob(int fd,const char *filename){
 		bobOpen =1;
 		bobFile->fd = fd;

