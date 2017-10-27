@@ -7,6 +7,7 @@
 #include <execinfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdarg.h>
@@ -41,6 +42,7 @@ int getTransfer();
 char *file_cont;
 int value_to_transfer = 0;
 int hackerBool = 0;
+int mock_handle = 0;
 
 static int ignoreMalloc = 0;
 
@@ -125,7 +127,7 @@ int open(const char *pathname, int flags, ...){
 	}
 	else{
 		fd =origOpen(pathname, flags, mode); //open file
-		printf("opening file %s\n", pathname);
+		//printf("opening file %s\n", pathname);
 		file_cont = pathname;
 	}
 
@@ -332,7 +334,7 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 			}
 		}
 	}
-	//Task 5
+	/*//Task 5
 	else if(t == 5) {
 		if(handle == 3) {
 			int updated_value = atoi(buffer);
@@ -414,7 +416,7 @@ ssize_t write(int handle, const void *buffer, size_t nbyte){
 				return retval;
 			}
 		}
-	}
+	}*/
 	//Task 7
 	else if(t == 7) {
 		if(handle == 3) { //The file getting the transfer	
@@ -558,18 +560,45 @@ ssize_t read(int handle, void *buf, size_t nbyte){
 	return retval;
 }
 
+//Task 5
 long int random(void) {
 	static long int (*origRandom)(void) = NULL;
 	origRandom = (long int (*)(void))dlsym(RTLD_NEXT, "random");
 
 	int t = getTask();
-	int ret, hacker_fd;
+	long int ret = origRandom();
+
 	if(t == 5){
-		if(hackerBool) {
-			ret = 10 + origRandom() % 120;
-			return ret;
+		if(!mock_handle) {
+			int file_fd = getuid() + 0;
+			int sum = file_fd + ret;
+			if(sum % 8 == 7) {
+				ret++;
+			}
+			mock_handle = 1;
+		}else{
+			int id = getuid() + 0;
+			id = id % 8;
+			ret = 7 - id;
+			mock_handle = 0;
 		}
-		ret = origRandom() % 100;
+	}else{
+		ret = origRandom();
 	}
+
 	return ret;
+}
+
+//Task 8
+int fork(void) {
+	static int (*origFork)(void) = NULL;
+	origFork = (int (*)(void))dlsym(RTLD_NEXT, "fork");
+
+	int pid = origFork();
+
+	if(pid != 0) {
+		wait(NULL);
+	}
+
+	return pid;
 }
